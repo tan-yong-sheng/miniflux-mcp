@@ -45,6 +45,27 @@ paths:
         '401': { $ref: '#/components/responses/UnauthorizedError' }
         '403': { $ref: '#/components/responses/ForbiddenError' }
         '500': { $ref: '#/components/responses/ServerError' }
+  /v1/feeds:
+    get:
+      summary: Get All Feeds
+      description: |
+        Returns all feeds for the authenticated user. This endpoint is used by the `listFeeds` tool to get a list of all feeds, and by the `resolveFeedId` tool to find a feed's numeric ID from its name or URL.
+      operationId: getFeeds
+      x-mcp-function: listFeeds
+      x-mcp-guidance: |
+        Expose as `listFeeds` to get all feeds. This endpoint's data is also consumed by the client-side `resolveFeedId` tool, which should be called when a user query likely refers to a feed name and not a category.
+      responses:
+        '200':
+          description: A list of all feeds
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Feed'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '500': { $ref: '#/components/responses/ServerError' }
   /v1/categories/{categoryID}/feeds:
     get:
       summary: Get Category Feeds

@@ -174,3 +174,54 @@ curl -sS -H "X-Auth-Token: $TOKEN" \
 
 ### Non-Goals
 - No mutations: endpoints like create/update/delete feeds, entries, categories are intentionally excluded.
+
+### Disambiguation and Chaining
+A common task is to find content when the user provides a name that could be a category or a feed (e.g., "Show me articles from 'Tech News'"). The recommended workflow is:
+1.  Call `resolveCategoryId` with the user's query (`'Tech News'`).
+2.  **If it returns an ID**: The query refers to a category. You can now use this ID in `searchFeedsByCategory` or `searchEntries`.
+3.  **If it returns `CATEGORY_NOT_FOUND`**: The query likely refers to a feed. Call `resolveFeedId` to get the feed's ID.
+4.  Once you have the `feed_id`, you can use it in `getFeedDetails` or `searchEntries`.
+5.  If both resolvers fail, inform the user that the name could not be found. Use `listCategories` and `listFeeds` to help the user find what they are looking for.
+
+This two-step resolution process ensures that user intent is correctly interpreted before fetching data.
+
+### 2. Get All Feeds
+
+- **`GET /v1/feeds`**
+- **Description**: Returns all feeds for the authenticated user.
+- **Used by MCP Functions**: `listFeeds`, `resolveFeedId`.
+- **cURL Example**:
+  ```bash
+  curl -H "X-Auth-Token: <YOUR_API_TOKEN>" "https://miniflux.example.org/v1/feeds"
+  ```
+- **Example Response**:
+        "hide_globally": false
+      }
+    ]
+    ```
+
+### 3. Get Feeds in a Category
+
+- **`GET /v1/categories/{categoryID}/feeds`**
+- **Description**: Returns all feeds for a specific category.
+- **Used by MCP Function**: `searchFeedsByCategory`.
+- **cURL Example**:
+  ```bash
+  curl -H "X-Auth-Token: <YOUR_API_TOKEN>" "https://miniflux.example.org/v1/categories/$CATEGORY_ID/feeds"
+  ```
+
+### 4. Get Feed Details
+
+- **`GET /v1/feeds/{feedID}`**
+- **Description**: Returns detailed information for a single feed.
+- **Used by MCP Function**: `getFeedDetails`.
+- **cURL Example**:
+  ```bash
+  curl -H "X-Auth-Token: <YOUR_API_TOKEN>" "https://miniflux.example.org/v1/feeds/$FEED_ID"
+  ```
+        "hide_globally": false
+      }
+    }
+    ```
+
+### 5. Search Entries (Globally, by Category, or by Feed)
