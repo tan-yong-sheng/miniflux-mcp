@@ -32,7 +32,7 @@ This method automatically downloads and runs the latest version of the package f
     "miniflux-mcp"
   ],
   "env": {
-    "MINIFLUX_BASE_URL": "https://your-miniflux-url",
+    "MINIFLUX_BASE_URL": "http://localhost:8080",
     "MINIFLUX_TOKEN": "<YOUR_MINIFLUX_API_TOKEN>"
   }
 }
@@ -47,7 +47,7 @@ This method automatically downloads and runs the latest version of the package f
     "miniflux-mcp"
   ],
   "env": {
-    "MINIFLUX_BASE_URL": "https://your-miniflux-url",
+    "MINIFLUX_BASE_URL": "http://localhost:8080",
     "MINIFLUX_TOKEN": "<YOUR_MINIFLUX_API_TOKEN>"
   }
 }
@@ -74,7 +74,7 @@ If you are developing the server locally, you can point the client directly to y
         "/path/to/miniflux-mcp/dist/server.js"
       ],
       "env": {
-        "MINIFLUX_BASE_URL": "https://your-miniflux-url",
+        "MINIFLUX_BASE_URL": "http://localhost:8080",
         "MINIFLUX_TOKEN": "<YOUR_MINIFLUX_API_TOKEN>"
       }
     }
