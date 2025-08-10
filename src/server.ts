@@ -114,11 +114,8 @@ server.registerTool(
   {
     title: "Resolve Feed ID",
     description:
-      "Resolves a feed's name or URL to its numeric ID *within a specific category*. This tool is essential when you need a `feed_id` for tools like `getFeedDetails` or `searchEntries`. It requires a `category_id` to scope the search. If the user provides a category name, you must call `resolveCategoryId` first to get the ID. If the user provides an ambiguous name (e.g., 'Lenny's Newsletter') and you have already confirmed it's not a category by calling `resolveCategoryId`, you may need to ask the user for the category it belongs to, or list categories for them to choose from using `listCategories`.",
+      "Resolves a feed's name or URL to its numeric ID by searching across all feeds. This tool should be used after an ambiguous query (e.g., \"search for 'Tech Weekly'\") has been tried with `resolveCategoryId` and failed. If `resolveCategoryId` returns `CATEGORY_NOT_FOUND`, you should call this tool to check if the user's query matches a feed title or URL.",
     inputSchema: {
-      category_id: z
-        .number()
-        .describe("Numeric ID of the category that contains the target feed."),
       feed_query: z
         .string()
         .describe(
@@ -126,8 +123,8 @@ server.registerTool(
         ),
     },
   },
-  async ({ category_id, feed_query }) => {
-    const res = await apiRequest(`/v1/categories/${category_id}/feeds`);
+  async ({ feed_query }) => {
+    const res = await apiRequest(`/v1/feeds`);
     const feeds = await json<Feed[]>(res);
 
     const q = feed_query.trim().toLowerCase();
@@ -246,7 +243,7 @@ server.registerTool(
       feed_id: z
         .number()
         .describe(
-          "Numeric ID of the feed. If you only have the feed's name, you must first find its category and then use `resolveFeedId` to get the numeric feed ID."
+          "Numeric ID of the feed. If you only have the feed's name, you must use `resolveFeedId` to get the numeric feed ID."
         ),
     },
   },
