@@ -85,7 +85,7 @@ server.registerTool(
   {
     title: "Resolve Category ID",
     description:
-      "Finds the numeric ID for a category by its name. It tries an exact match, then a case-insensitive match, and finally a partial match.",
+      "Resolves a category name to its numeric ID. Call this tool when a user mentions a category by name and you need its ID for another tool, like `searchFeedsByCategory` or `searchEntries`. For ambiguous queries where a name could be a category OR a feed (e.g., 'show me posts from \"Tech Stuff\"'), use this tool first to check if a matching category exists. If it returns an ID, you can proceed with category-scoped tools. If not, the name might refer to a feed.",
     inputSchema: {
       category_name: z
         .string()
@@ -108,17 +108,112 @@ server.registerTool(
   }
 );
 
+// resolveFeedId
+server.registerTool(
+  "resolveFeedId",
+  {
+    title: "Resolve Feed ID",
+    description:
+      "Resolves a feed's name or URL to its numeric ID *within a specific category*. This tool is essential when you need a `feed_id` for tools like `getFeedDetails` or `searchEntries`. It requires a `category_id` to scope the search. If the user provides a category name, you must call `resolveCategoryId` first to get the ID. If the user provides an ambiguous name (e.g., 'Lenny's Newsletter') and you have already confirmed it's not a category by calling `resolveCategoryId`, you may need to ask the user for the category it belongs to, or list categories for them to choose from using `listCategories`.",
+    inputSchema: {
+      category_id: z
+        .number()
+        .describe("Numeric ID of the category that contains the target feed."),
+      feed_query: z
+        .string()
+        .describe(
+          "Feed title or URL (site_url or feed_url). Exact, case-insensitive, and partial matches are attempted in this order."
+        ),
+    },
+  },
+  async ({ category_id, feed_query }) => {
+    const res = await apiRequest(`/v1/categories/${category_id}/feeds`);
+    const feeds = await json<Feed[]>(res);
+
+    const q = feed_query.trim().toLowerCase();
+
+    // Exact (case-sensitive) title match
+    const exactTitle = feeds.find((f) => (f.title || "") === feed_query);
+    if (exactTitle) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ feed_id: exactTitle.id }) },
+        ],
+      };
+    }
+
+    // Case-insensitive equality checks (title, site_url, feed_url)
+    const ciEquals = feeds.find(
+      (f) =>
+        (f.title || "").toLowerCase() === q ||
+        (f.site_url || "").toLowerCase() === q ||
+        (f.feed_url || "").toLowerCase() === q
+    );
+    if (ciEquals) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ feed_id: ciEquals.id }) },
+        ],
+      };
+    }
+
+    // Partial matches across title, site_url, feed_url
+    const partial = feeds.filter(
+      (f) =>
+        (f.title || "").toLowerCase().includes(q) ||
+        (f.site_url || "").toLowerCase().includes(q) ||
+        (f.feed_url || "").toLowerCase().includes(q)
+    );
+
+    if (partial.length === 1) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ feed_id: partial[0].id }) },
+        ],
+      };
+    }
+
+    if (partial.length > 1) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: "AMBIGUOUS_FEED",
+              candidates: partial.map((f) => ({
+                id: f.id,
+                title: f.title,
+                site_url: f.site_url,
+                feed_url: f.feed_url,
+              })),
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        { type: "text", text: JSON.stringify({ error: "FEED_NOT_FOUND" }) },
+      ],
+      isError: true,
+    };
+  }
+);
+
 // searchFeedsByCategory
 server.registerTool(
   "searchFeedsByCategory",
   {
     title: "Search Feeds by Category",
-    description:
-      "Searches for feeds within a specific Miniflux category. Requires a numeric `category_id`. If the user provides a category name, you must call `resolveCategoryId` first to convert the name into an ID.",
+    description: "Search for feeds within a specific Miniflux category.",
     inputSchema: {
       category_id: z
         .number()
-        .describe("Numeric ID of the category to search in."),
+        .describe(
+          "Numeric ID of the category. You must use `resolveCategoryId` to get this value if the user provides a category name instead of an ID."
+        ),
       query: z
         .string()
         .optional()
@@ -146,11 +241,14 @@ server.registerTool(
   "getFeedDetails",
   {
     title: "Get Feed Details",
-    description:
-      "Gets the details of a single feed. Requires a numeric `feed_id`. To find a `feed_id` for a named feed, use `searchFeedsByCategory` first.",
+    description: "Get details for a single Miniflux feed.",
     inputSchema: {
-      feed_id: z.number().describe("Numeric ID of the feed to retrieve."),
-    }
+      feed_id: z
+        .number()
+        .describe(
+          "Numeric ID of the feed. If you only have the feed's name, you must first find its category and then use `resolveFeedId` to get the numeric feed ID."
+        ),
+    },
   },
   async ({ feed_id }) => {
   const res = await apiRequest(`/v1/feeds/${feed_id}`);
@@ -165,7 +263,7 @@ server.registerTool(
   {
     title: "Search Entries",
     description:
-      "Searches for entries (articles). Can be scoped globally, to a category, or to a single feed. To scope to a category, provide `category_id`. To scope to a feed, provide `feed_id`. If the user provides names instead of IDs, you must use `resolveCategoryId` to find a category's ID, and `searchFeedsByCategory` to find a feed's ID.",
+      "Searches for entries (articles). Can be global or scoped by category, feed, or both. For scoped searches, you MUST provide the numeric ID for the category or feed. Use `resolveCategoryId` to find category IDs and `resolveFeedId` to find feed IDs from user-provided names.",
     inputSchema: {
       category_id: z
         .number()
