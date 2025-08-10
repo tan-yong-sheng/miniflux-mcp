@@ -54,6 +54,31 @@ interface Category { id: number; title: string }
 interface Feed { id: number; title: string; site_url?: string | null; feed_url?: string | null }
 interface EntriesResponse { total: number; entries: unknown[] }
 
+// String normalization helpers for robust matching
+function stripDiacritics(input: string): string {
+  return input.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function toLower(input: string): string {
+  return stripDiacritics(input).toLowerCase();
+}
+
+function collapseNonAlnum(input: string): string {
+  return toLower(input).replace(/[^a-z0-9]/gi, "");
+}
+
+function tokenizeAlnum(input: string): string[] {
+  return toLower(input)
+    .split(/[^a-z0-9]+/gi)
+    .filter((token) => token.length > 0);
+}
+
+function tokensAreSubset(queryTokens: string[], targetTokens: string[]): boolean {
+  if (queryTokens.length === 0) return false;
+  const targetSet = new Set(targetTokens);
+  return queryTokens.every((token) => targetSet.has(token));
+}
+
 const server = new McpServer({ name: "miniflux-mcp", version: "1.0.0" });
 
 // listCategories
@@ -89,22 +114,101 @@ server.registerTool(
     inputSchema: {
       category_name: z
         .string()
-        .describe("The name of the category to resolve."),
+        .describe(
+          "The display name of the category. Matching uses exact, case-insensitive, and normalized comparisons that ignore spaces/punctuation and diacritics."
+        ),
     },
   },
   async ({ category_name }) => {
-  const res = await apiRequest(`/v1/categories`);
-  const categories = await json<Category[]>(res);
-  const exact = categories.find(c => c.title === category_name);
-    if (exact) return { content: [{ type: "text", text: JSON.stringify({ category_id: exact.id }) }] };
-  const ciExact = categories.find(c => c.title.toLowerCase() === category_name.toLowerCase());
-    if (ciExact) return { content: [{ type: "text", text: JSON.stringify({ category_id: ciExact.id }) }] };
-  const partial = categories.filter(c => c.title.toLowerCase().includes(category_name.toLowerCase()));
-    if (partial.length === 1) return { content: [{ type: "text", text: JSON.stringify({ category_id: partial[0].id }) }] };
-    if (partial.length > 1) {
-      return { content: [{ type: "text", text: JSON.stringify({ error: "AMBIGUOUS_CATEGORY", candidates: partial.map(c => ({ id: c.id, title: c.title })) }) }], isError: true };
+    const res = await apiRequest(`/v1/categories`);
+    const categories = await json<Category[]>(res);
+
+    const raw = category_name;
+    const lower = toLower(raw);
+    const collapsed = collapseNonAlnum(raw);
+    const queryTokens = tokenizeAlnum(raw);
+
+    // 1) Exact (case-sensitive)
+    let match = categories.find((c) => (c.title || "") === raw);
+    if (!match) {
+      // 2) Case-insensitive
+      match = categories.find((c) => toLower(c.title || "") === lower);
     }
-    return { content: [{ type: "text", text: JSON.stringify({ error: "CATEGORY_NOT_FOUND" }) }], isError: true };
+    if (!match) {
+      // 3) Collapsed non-alnum equals
+      match = categories.find(
+        (c) => collapseNonAlnum(c.title || "") === collapsed
+      );
+    }
+    if (match) {
+      return {
+        content: [{ type: "text", text: JSON.stringify({ category_id: match.id }) }],
+      };
+    }
+
+    // 4) Token subset match
+    const tokenCandidates = categories.filter((c) =>
+      tokensAreSubset(queryTokens, tokenizeAlnum(c.title || ""))
+    );
+    if (tokenCandidates.length === 1) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ category_id: tokenCandidates[0].id }) },
+        ],
+      };
+    }
+    if (tokenCandidates.length > 1) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: "AMBIGUOUS_CATEGORY",
+              candidates: tokenCandidates.map((c) => ({ id: c.id, title: c.title })),
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // 5) Partial includes (lower/collapsed)
+    const partial = categories.filter((c) => {
+      const t = c.title || "";
+      return (
+        toLower(t).includes(lower) || collapseNonAlnum(t).includes(collapsed)
+      );
+    });
+
+    if (partial.length === 1) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ category_id: partial[0].id }) },
+        ],
+      };
+    }
+
+    if (partial.length > 1) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: "AMBIGUOUS_CATEGORY",
+              candidates: partial.map((c) => ({ id: c.id, title: c.title })),
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    return {
+      content: [
+        { type: "text", text: JSON.stringify({ error: "CATEGORY_NOT_FOUND" }) },
+      ],
+      isError: true,
+    };
   }
 );
 
@@ -114,12 +218,12 @@ server.registerTool(
   {
     title: "Resolve Feed ID",
     description:
-      "Resolves a feed's name or URL to its numeric ID by searching across all feeds. This tool should be used after an ambiguous query (e.g., \"search for 'Tech Weekly'\") has been tried with `resolveCategoryId` and failed. If `resolveCategoryId` returns `CATEGORY_NOT_FOUND`, you should call this tool to check if the user's query matches a feed title or URL.",
+      "Resolves a feed's name or URL to its numeric ID by searching across all feeds. This tool should be used after an ambiguous query (e.g., \"search for 'Tech Weekly'\") has been tried with `resolveCategoryId` and failed. If `resolveCategoryId` returns `CATEGORY_NOT_FOUND`, you should call this tool to check if the user's query matches a feed title or URL. Matching uses exact, case-insensitive, token, and normalized comparisons that ignore spaces/punctuation and diacritics (e.g., 'AI Code King' matches 'AICodeKing').",
     inputSchema: {
       feed_query: z
         .string()
         .describe(
-          "Feed title or URL (site_url or feed_url). Exact, case-insensitive, and partial matches are attempted in this order."
+          "Feed title or URL (site_url or feed_url). Exact, case-insensitive, token, and normalized matches are attempted in this order."
         ),
     },
   },
@@ -127,10 +231,13 @@ server.registerTool(
     const res = await apiRequest(`/v1/feeds`);
     const feeds = await json<Feed[]>(res);
 
-    const q = feed_query.trim().toLowerCase();
+    const raw = feed_query;
+    const lower = toLower(raw);
+    const collapsed = collapseNonAlnum(raw);
+    const queryTokens = tokenizeAlnum(raw);
 
-    // Exact (case-sensitive) title match
-    const exactTitle = feeds.find((f) => (f.title || "") === feed_query);
+    // 1) Exact (case-sensitive) title match
+    let exactTitle = feeds.find((f) => (f.title || "") === raw);
     if (exactTitle) {
       return {
         content: [
@@ -139,12 +246,12 @@ server.registerTool(
       };
     }
 
-    // Case-insensitive equality checks (title, site_url, feed_url)
-    const ciEquals = feeds.find(
+    // 2) Case-insensitive equality checks (title, site_url, feed_url)
+    let ciEquals = feeds.find(
       (f) =>
-        (f.title || "").toLowerCase() === q ||
-        (f.site_url || "").toLowerCase() === q ||
-        (f.feed_url || "").toLowerCase() === q
+        toLower(f.title || "") === lower ||
+        toLower(f.site_url || "") === lower ||
+        toLower(f.feed_url || "") === lower
     );
     if (ciEquals) {
       return {
@@ -154,13 +261,66 @@ server.registerTool(
       };
     }
 
-    // Partial matches across title, site_url, feed_url
-    const partial = feeds.filter(
+    // 3) Collapsed non-alnum equality (title, site_url, feed_url)
+    let collapsedEq = feeds.find(
       (f) =>
-        (f.title || "").toLowerCase().includes(q) ||
-        (f.site_url || "").toLowerCase().includes(q) ||
-        (f.feed_url || "").toLowerCase().includes(q)
+        collapseNonAlnum(f.title || "") === collapsed ||
+        collapseNonAlnum(f.site_url || "") === collapsed ||
+        collapseNonAlnum(f.feed_url || "") === collapsed
     );
+    if (collapsedEq) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ feed_id: collapsedEq.id }) },
+        ],
+      };
+    }
+
+    // 4) Token subset match on title
+    const tokenCandidates = feeds.filter((f) =>
+      tokensAreSubset(queryTokens, tokenizeAlnum(f.title || ""))
+    );
+    if (tokenCandidates.length === 1) {
+      return {
+        content: [
+          { type: "text", text: JSON.stringify({ feed_id: tokenCandidates[0].id }) },
+        ],
+      };
+    }
+    if (tokenCandidates.length > 1) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({
+              error: "AMBIGUOUS_FEED",
+              candidates: tokenCandidates.map((f) => ({
+                id: f.id,
+                title: f.title,
+                site_url: f.site_url,
+                feed_url: f.feed_url,
+              })),
+            }),
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // 5) Partial includes across lower/collapsed in title, site_url, feed_url
+    const partial = feeds.filter((f) => {
+      const t = f.title || "";
+      const s = f.site_url || "";
+      const u = f.feed_url || "";
+      return (
+        toLower(t).includes(lower) ||
+        toLower(s).includes(lower) ||
+        toLower(u).includes(lower) ||
+        collapseNonAlnum(t).includes(collapsed) ||
+        collapseNonAlnum(s).includes(collapsed) ||
+        collapseNonAlnum(u).includes(collapsed)
+      );
+    });
 
     if (partial.length === 1) {
       return {
