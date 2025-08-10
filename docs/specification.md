@@ -185,43 +185,16 @@ A common task is to find content when the user provides a name that could be a c
 
 This two-step resolution process ensures that user intent is correctly interpreted before fetching data.
 
+#### Resolver Matching Algorithm
+For both `resolveCategoryId` and `resolveFeedId`, names are matched using the following order:
+1) Exact match (case-sensitive)
+2) Case-insensitive equality
+3) Collapsed non-alphanumeric equality (remove spaces/punctuation; e.g., "AI Code King" ≈ "AICodeKing")
+4) Token subset match (all query tokens must appear in target tokens)
+5) Partial includes (lowercased and collapsed comparisons)
+
+Note: Matching removes diacritics before comparison (e.g., "Café" ≈ "Cafe").
+
 ### 2. Get All Feeds
 
-- **`GET /v1/feeds`**
-- **Description**: Returns all feeds for the authenticated user.
-- **Used by MCP Functions**: `listFeeds`, `resolveFeedId`.
-- **cURL Example**:
-  ```bash
-  curl -H "X-Auth-Token: <YOUR_API_TOKEN>" "https://miniflux.example.org/v1/feeds"
-  ```
-- **Example Response**:
-        "hide_globally": false
-      }
-    ]
-    ```
-
-### 3. Get Feeds in a Category
-
-- **`GET /v1/categories/{categoryID}/feeds`**
-- **Description**: Returns all feeds for a specific category.
-- **Used by MCP Function**: `searchFeedsByCategory`.
-- **cURL Example**:
-  ```bash
-  curl -H "X-Auth-Token: <YOUR_API_TOKEN>" "https://miniflux.example.org/v1/categories/$CATEGORY_ID/feeds"
-  ```
-
-### 4. Get Feed Details
-
-- **`GET /v1/feeds/{feedID}`**
-- **Description**: Returns detailed information for a single feed.
-- **Used by MCP Function**: `getFeedDetails`.
-- **cURL Example**:
-  ```bash
-  curl -H "X-Auth-Token: <YOUR_API_TOKEN>" "https://miniflux.example.org/v1/feeds/$FEED_ID"
-  ```
-        "hide_globally": false
-      }
-    }
-    ```
-
-### 5. Search Entries (Globally, by Category, or by Feed)
+- **`
