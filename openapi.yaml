@@ -1,0 +1,489 @@
+openapi: 3.0.3
+info:
+  title: Miniflux MCP Read-Only API
+  version: 0.0.1
+  description: |
+    Read-only subset of Miniflux API for MCP usage. Covers listing/searching feeds,
+    resolving category ID by name (via client-side filtering), listing feeds in a category,
+    and fetching details of a single feed.
+    
+    Reference: `miniflux_api_reference.html` (Authentication, Get Categories, Get Feeds, Get Category Feeds, Get Feed).
+servers:
+  - url: https://miniflux.example.org
+    description: Example Miniflux instance
+security:
+  - XAuthToken: []
+  - basicAuth: []
+paths:
+  /v1/categories:
+    get:
+      summary: Get Categories
+      description: |
+        Returns all categories for the authenticated user. Optionally include counters since Miniflux 2.0.46.
+        MCP guidance: Expose this operation as the `listCategories` tool to allow browsing categories. It is also used by `resolveCategoryId` to convert a user-provided category name into a numeric `category_id`. Titles are user-defined and might not be unique; implement exact match first, then fallback strategies.
+      x-mcp-function: listCategories
+      x-mcp-guidance: |
+        Expose as `listCategories` to list categories (optionally with counters). Also used by `resolveCategoryId`.
+        You must call `resolveCategoryId` before invoking any function that requires `category_id` if the user only supplied a category name. Skip if the user explicitly provided a numeric `category_id`.
+      operationId: getCategories
+      parameters:
+        - name: counts
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Include total_unread and feed_count (since 2.0.46)
+      responses:
+        '200':
+          description: A list of categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /v1/categories/{categoryID}/feeds:
+    get:
+      summary: Get Category Feeds
+      description: Returns feeds for a specific category.
+      operationId: getCategoryFeeds
+      x-mcp-function: searchFeedsByCategory
+      x-mcp-guidance: |
+        This operation requires a numeric `category_id`. If the user provides only a category name, call `resolveCategoryId` first to obtain the `category_id`.
+      parameters:
+        - name: categoryID
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: A list of feeds in the category
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Feed'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /v1/feeds/{feedID}:
+    get:
+      summary: Get Feed
+      description: Returns details for a single feed.
+      operationId: getFeed
+      x-mcp-function: getFeedDetails
+      parameters:
+        - name: feedID
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Feed details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Feed'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '404':
+          description: Feed not found
+        '500': { $ref: '#/components/responses/ServerError' }
+  /v1/entries:
+    get:
+      summary: Get Entries
+      description: Returns entries (articles) across all feeds for the authenticated user.
+      operationId: getEntries
+      x-mcp-function: searchEntries
+      parameters:
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/order'
+        - $ref: '#/components/parameters/direction'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/published_before'
+        - $ref: '#/components/parameters/published_after'
+        - $ref: '#/components/parameters/changed_before'
+        - $ref: '#/components/parameters/changed_after'
+        - $ref: '#/components/parameters/before_entry_id'
+        - $ref: '#/components/parameters/after_entry_id'
+        - $ref: '#/components/parameters/starred'
+        - $ref: '#/components/parameters/search'
+        - $ref: '#/components/parameters/category_id'
+      responses:
+        '200':
+          description: Paginated entries list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntriesResponse'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /v1/categories/{categoryID}/entries:
+    get:
+      summary: Get Category Entries
+      description: Returns entries for a specific category.
+      operationId: getCategoryEntries
+      x-mcp-function: searchEntries
+      x-mcp-guidance: |
+        This operation requires a numeric `category_id`. If the user provides only a category name, call `resolveCategoryId` first.
+      parameters:
+        - name: categoryID
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/order'
+        - $ref: '#/components/parameters/direction'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/published_before'
+        - $ref: '#/components/parameters/published_after'
+        - $ref: '#/components/parameters/changed_before'
+        - $ref: '#/components/parameters/changed_after'
+        - $ref: '#/components/parameters/before_entry_id'
+        - $ref: '#/components/parameters/after_entry_id'
+        - $ref: '#/components/parameters/starred'
+        - $ref: '#/components/parameters/search'
+      responses:
+        '200':
+          description: Paginated entries list for the category
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntriesResponse'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+  /v1/feeds/{feedID}/entries:
+    get:
+      summary: Get Feed Entries
+      description: Returns entries for a specific feed.
+      operationId: getFeedEntries
+      x-mcp-function: searchEntries
+      parameters:
+        - name: feedID
+          in: path
+          required: true
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/status'
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/order'
+        - $ref: '#/components/parameters/direction'
+        - $ref: '#/components/parameters/before'
+        - $ref: '#/components/parameters/after'
+        - $ref: '#/components/parameters/published_before'
+        - $ref: '#/components/parameters/published_after'
+        - $ref: '#/components/parameters/changed_before'
+        - $ref: '#/components/parameters/changed_after'
+        - $ref: '#/components/parameters/before_entry_id'
+        - $ref: '#/components/parameters/after_entry_id'
+        - $ref: '#/components/parameters/starred'
+        - $ref: '#/components/parameters/search'
+      responses:
+        '200':
+          description: Paginated entries list for the feed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntriesResponse'
+        '401': { $ref: '#/components/responses/UnauthorizedError' }
+        '403': { $ref: '#/components/responses/ForbiddenError' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+components:
+  securitySchemes:
+    XAuthToken:
+      type: apiKey
+      in: header
+      name: X-Auth-Token
+      description: API token authentication
+    basicAuth:
+      type: http
+      scheme: basic
+  responses:
+    UnauthorizedError:
+      description: Unauthorized
+    ForbiddenError:
+      description: Forbidden
+    ServerError:
+      description: Internal Server Error
+  parameters:
+    status:
+      name: status
+      in: query
+      description: Entry status; repeat parameter to filter multiple statuses
+      schema:
+        type: array
+        items:
+          type: string
+          enum: [read, unread, removed]
+      style: form
+      explode: true
+    offset:
+      name: offset
+      in: query
+      schema:
+        type: integer
+        minimum: 0
+    limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+    order:
+      name: order
+      in: query
+      schema:
+        type: string
+        enum: [id, status, published_at, category_title, category_id]
+    direction:
+      name: direction
+      in: query
+      schema:
+        type: string
+        enum: [asc, desc]
+    before:
+      name: before
+      in: query
+      description: Unix timestamp; include entries created before this time
+      schema:
+        type: integer
+        format: int64
+    after:
+      name: after
+      in: query
+      description: Unix timestamp; include entries created after this time
+      schema:
+        type: integer
+        format: int64
+    published_before:
+      name: published_before
+      in: query
+      description: Unix timestamp; include entries published before this time
+      schema:
+        type: integer
+        format: int64
+    published_after:
+      name: published_after
+      in: query
+      description: Unix timestamp; include entries published after this time
+      schema:
+        type: integer
+        format: int64
+    changed_before:
+      name: changed_before
+      in: query
+      description: Unix timestamp; include entries changed before this time
+      schema:
+        type: integer
+        format: int64
+    changed_after:
+      name: changed_after
+      in: query
+      description: Unix timestamp; include entries changed after this time
+      schema:
+        type: integer
+        format: int64
+    before_entry_id:
+      name: before_entry_id
+      in: query
+      schema:
+        type: integer
+        format: int64
+    after_entry_id:
+      name: after_entry_id
+      in: query
+      schema:
+        type: integer
+        format: int64
+    starred:
+      name: starred
+      in: query
+      schema:
+        type: boolean
+    search:
+      name: search
+      in: query
+      schema:
+        type: string
+    category_id:
+      name: category_id
+      in: query
+      description: Filter entries by category id (for /v1/entries only)
+      schema:
+        type: integer
+  schemas:
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        hide_globally:
+          type: boolean
+        feed_count:
+          type: integer
+          nullable: true
+        total_unread:
+          type: integer
+          nullable: true
+    Feed:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        site_url:
+          type: string
+        feed_url:
+          type: string
+        checked_at:
+          type: string
+          format: date-time
+          nullable: true
+        etag_header:
+          type: string
+          nullable: true
+        last_modified_header:
+          type: string
+          nullable: true
+        parsing_error_message:
+          type: string
+          nullable: true
+        parsing_error_count:
+          type: integer
+          nullable: true
+        scraper_rules:
+          type: string
+          nullable: true
+        rewrite_rules:
+          type: string
+          nullable: true
+        crawler:
+          type: boolean
+          nullable: true
+        blocklist_rules:
+          type: string
+          nullable: true
+        keeplist_rules:
+          type: string
+          nullable: true
+        user_agent:
+          type: string
+          nullable: true
+        username:
+          type: string
+          nullable: true
+        password:
+          type: string
+          nullable: true
+        disabled:
+          type: boolean
+          nullable: true
+        ignore_http_cache:
+          type: boolean
+          nullable: true
+        fetch_via_proxy:
+          type: boolean
+          nullable: true
+        category:
+          $ref: '#/components/schemas/Category'
+        icon:
+          type: object
+          nullable: true
+          properties:
+            feed_id:
+              type: integer
+            icon_id:
+              type: integer
+    FeedIcon:
+      type: object
+      properties:
+        id:
+          type: integer
+        data:
+          type: string
+          description: mime;data base64
+        mime_type:
+          type: string
+    Entry:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        feed_id:
+          type: integer
+        title:
+          type: string
+        url:
+          type: string
+        comments_url:
+          type: string
+          nullable: true
+        author:
+          type: string
+          nullable: true
+        content:
+          type: string
+        hash:
+          type: string
+        published_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [read, unread, removed]
+        share_code:
+          type: string
+          nullable: true
+        starred:
+          type: boolean
+        reading_time:
+          type: integer
+        enclosures:
+          type: array
+          items:
+            type: object
+        feed:
+          $ref: '#/components/schemas/Feed'
+        tags:
+          type: array
+          items:
+            type: string
+    EntriesResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entry'

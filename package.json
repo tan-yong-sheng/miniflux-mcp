@@ -1,0 +1,40 @@
+{
+  "name": "miniflux-mcp",
+  "version": "0.0.2",
+  "description": "A read-only MCP server for the Miniflux RSS reader.",
+  "main": "dist/server.js",
+  "bin": {
+    "miniflux-mcp": "dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "start": "node dist/server.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "openapi.yaml"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/miniflux-mcp.git"
+  },
+  "keywords": [
+    "miniflux",
+    "mcp",
+    "model-context-protocol",
+    "rss"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.2",
+    "dotenv": "^16.4.5",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  }
+}
+
+
