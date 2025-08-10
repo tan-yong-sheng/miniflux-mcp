@@ -254,6 +254,22 @@ server.registerTool(
   }
 );
 
+// listFeeds
+server.registerTool(
+  "listFeeds",
+  {
+    title: "List All Feeds",
+    description:
+      "Lists all feeds for the authenticated user using the Miniflux `/v1/feeds` endpoint. Use this to browse feeds or to help identify a feed before calling `getFeedDetails`.",
+    inputSchema: {},
+  },
+  async () => {
+    const res = await apiRequest(`/v1/feeds`);
+    const feeds = await json<Feed[]>(res);
+    return { content: [{ type: "text", text: JSON.stringify({ feeds }) }] };
+  }
+);
+
 // searchEntries (global/category/feed)
 server.registerTool(
   "searchEntries",
