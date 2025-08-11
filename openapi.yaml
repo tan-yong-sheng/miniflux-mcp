@@ -6,8 +6,7 @@ info:
     Read-only subset of Miniflux API for MCP usage. Covers listing/searching feeds,
     resolving category ID by name (via client-side filtering), listing feeds in a category,
     and fetching details of a single feed.
-    
-    Reference: `miniflux_api_reference.html` (Authentication, Get Categories, Get Feeds, Get Category Feeds, Get Feed).
+
 servers:
   - url: https://miniflux.example.org
     description: Example Miniflux instance

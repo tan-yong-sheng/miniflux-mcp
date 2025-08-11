@@ -1,7 +1,5 @@
 ### Miniflux MCP Read-Only Spec
 
-Reference: `miniflux_api_specification.html` (see sections: Get Categories, Get Category Feeds, Get Feed, Get Entries, Get Category Entries, Get Feed Entries)
-
 #### Scope
 - **Read-only only**: list/search all feeds, resolve category ID by name, list/search feeds within a category, fetch a single feed’s details.
 - No write operations are used.
@@ -23,7 +21,7 @@ Reference: `miniflux_api_specification.html` (see sections: Get Categories, Get 
   - Supports server-side filters: `search`, `status`, `starred`, `offset`, `limit`, `order`, `direction`, `before`, `after`, `published_before`, `published_after`, `changed_before`, `changed_after`, `before_entry_id`, `after_entry_id`.
 
 #### Authentication
-- **Preferred**: API Key via header `X-Auth-Token` (see “Authentication” section in `miniflux_api_reference.html`).
+- **Preferred**: API Key via header `X-Auth-Token`
 - **Alternative**: HTTP Basic.
 
 #### Environment
