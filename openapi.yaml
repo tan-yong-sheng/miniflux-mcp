@@ -23,8 +23,7 @@ paths:
         MCP guidance: Expose this operation as the `listCategories` tool to allow browsing categories. It is also used by `resolveCategoryId` to convert a user-provided category name into a numeric `category_id`. Titles are user-defined and might not be unique; implement exact match first, then fallback strategies.
       x-mcp-function: listCategories
       x-mcp-guidance: |
-        Expose as `listCategories` to list categories (optionally with counters). Also used by `resolveCategoryId`.
-        You must call `resolveCategoryId` before invoking any function that requires `category_id` if the user only supplied a category name. Skip if the user explicitly provided a numeric `category_id`.
+        Expose as `listCategories`. This tool is for user browsing or as a fallback to help the user find a category after the `resolveCategoryId` and `resolveFeedId` tools have both failed.
       operationId: getCategories
       parameters:
         - name: counts
@@ -53,7 +52,7 @@ paths:
       operationId: getFeeds
       x-mcp-function: listFeeds
       x-mcp-guidance: |
-        Expose as `listFeeds` to get all feeds. This endpoint's data is also consumed by the client-side `resolveFeedId` tool, which should be called when a user query likely refers to a feed name and not a category.
+        Expose as `listFeeds` for user browsing or as a fallback after resolvers fail. Also used by `resolveFeedId` to get the list of feeds to search through.
       responses:
         '200':
           description: A list of all feeds

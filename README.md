@@ -82,17 +82,23 @@ If you are developing the server locally, you can point the client directly to y
 
 ## Available Tools
 
-The server provides the following read-only tools for interacting with Miniflux:
+The server provides the following read-only tools for interacting with Miniflux.
 
-*   **`resolveCategoryId(category_name)`**: Resolves a category name to its numeric ID. This should be the first step in handling an ambiguous user query.
-*   **`resolveFeedId(feed_query)`**: Resolves a feed name or URL to its numeric ID by searching all available feeds. Should be called after `resolveCategoryId` fails for an ambiguous query.
-*   **`listCategories(counts)`**: Lists all available Miniflux categories.
-*   **`listFeeds()`**: Lists all available feeds for the user.
-*   **`searchFeedsByCategory(category_id, query)`**: Searches for feeds within a specific category. Requires a numeric `category_id`.
-*   **`getFeedDetails(feed_id)`**: Retrieves detailed information for a single feed. Requires a numeric `feed_id`.
-*   **`searchEntries(...)`**: A powerful tool to search for articles. Can be scoped globally, by category ID, or by feed ID.
+**Resolver/Search Workflow:**
+For any query involving a name (e.g., "find 'Tech Stuff'"), you must follow this sequence:
+1.  `resolveCategoryId`: Try to match the name to a category.
+2.  `resolveFeedId`: If no category is found, try to match the name to a feed.
+3.  `listCategories` / `listFeeds`: If both resolvers fail, inform the user and offer these tools to help them find the correct name.
 
-For ambiguous queries where a name could be a category or a feed (e.g., "show me posts from 'Tech Stuff'"), you should always call `resolveCategoryId` first. If it fails, then call `resolveFeedId`.
+**Available Tools:**
+
+*   **`resolveCategoryId(category_name)`**: **(Step 1)** Resolves a category name to its ID.
+*   **`resolveFeedId(feed_query)`**: **(Step 2)** Resolves a feed name/URL to its ID.
+*   **`listCategories(counts)`**: **(Fallback)** Lists all categories for browsing.
+*   **`listFeeds()`**: **(Fallback)** Lists all feeds for browsing.
+*   **`searchFeedsByCategory(category_id, query)`**: Searches for feeds within a *specific category*.
+*   **`getFeedDetails(feed_id)`**: Retrieves details for a *single feed*.
+*   **`searchEntries(...)`**: Searches for articles. Can be scoped by `category_id` or `feed_id` once resolved.
 
 ## Development
 

@@ -86,7 +86,8 @@ server.registerTool(
   "listCategories",
   {
     title: "List Miniflux Categories",
-    description: "List all available Miniflux categories.",
+    description:
+      "Lists all available Miniflux categories. This tool is useful for general user browsing, or as a fallback to help the user find a category after the `resolveCategoryId` and `resolveFeedId` tools have both failed to find a match for their query.",
     inputSchema: {
       counts: z
         .boolean()
@@ -110,7 +111,7 @@ server.registerTool(
   {
     title: "Resolve Category ID",
     description:
-      "Resolves a category name to its numeric ID. Call this tool when a user mentions a category by name and you need its ID for another tool, like `searchFeedsByCategory` or `searchEntries`. For ambiguous queries where a name could be a category OR a feed (e.g., 'show me posts from \"Tech Stuff\"'), use this tool first to check if a matching category exists. If it returns an ID, you can proceed with category-scoped tools. If not, the name might refer to a feed.",
+      "Resolves a category name to its numeric ID. This is the FIRST tool to call for any ambiguous user query that contains a name (e.g., 'show me posts from \"Tech Stuff\"'). If this tool succeeds, use the returned ID for other functions. If it returns `CATEGORY_NOT_FOUND`, the name might refer to a feed, and you should call `resolveFeedId` next.",
     inputSchema: {
       category_name: z
         .string()
@@ -218,7 +219,7 @@ server.registerTool(
   {
     title: "Resolve Feed ID",
     description:
-      "Resolves a feed's name or URL to its numeric ID by searching across all feeds. This tool should be used after an ambiguous query (e.g., \"search for 'Tech Weekly'\") has been tried with `resolveCategoryId` and failed. If `resolveCategoryId` returns `CATEGORY_NOT_FOUND`, you should call this tool to check if the user's query matches a feed title or URL. Matching uses exact, case-insensitive, token, and normalized comparisons that ignore spaces/punctuation and diacritics (e.g., 'AI Code King' matches 'AICodeKing').",
+      "Resolves a feed's name or URL to its numeric ID. This is the SECOND tool to call for an ambiguous user query, but ONLY after `resolveCategoryId` has already been tried and failed. If this tool also returns `FEED_NOT_FOUND`, you MUST inform the user that no match was found and offer to list all categories or feeds using the `listCategories` or `listFeeds` tools to help them.",
     inputSchema: {
       feed_query: z
         .string()
@@ -420,7 +421,7 @@ server.registerTool(
   {
     title: "List All Feeds",
     description:
-      "Lists all feeds for the authenticated user using the Miniflux `/v1/feeds` endpoint. Use this to browse feeds or to help identify a feed before calling `getFeedDetails`.",
+      "Lists all feeds for the authenticated user. This tool is useful for general user browsing, or as a fallback to help the user find a feed after the `resolveCategoryId` and `resolveFeedId` tools have both failed to find a match for their query.",
     inputSchema: {},
   },
   async () => {

@@ -175,16 +175,6 @@ curl -sS -H "X-Auth-Token: $TOKEN" \
 ### Non-Goals
 - No mutations: endpoints like create/update/delete feeds, entries, categories are intentionally excluded.
 
-### Disambiguation and Chaining
-A common task is to find content when the user provides a name that could be a category or a feed (e.g., "Show me articles from 'Tech News'"). The recommended workflow is:
-1.  Call `resolveCategoryId` with the user's query (`'Tech News'`).
-2.  **If it returns an ID**: The query refers to a category. You can now use this ID in `searchFeedsByCategory` or `searchEntries`.
-3.  **If it returns `CATEGORY_NOT_FOUND`**: The query likely refers to a feed. Call `resolveFeedId` to get the feed's ID.
-4.  Once you have the `feed_id`, you can use it in `getFeedDetails` or `searchEntries`.
-5.  If both resolvers fail, inform the user that the name could not be found. Use `listCategories` and `listFeeds` to help the user find what they are looking for.
-
-This two-step resolution process ensures that user intent is correctly interpreted before fetching data.
-
 #### Resolver Matching Algorithm
 For both `resolveCategoryId` and `resolveFeedId`, names are matched using the following order:
 1) Exact match (case-sensitive)
@@ -195,6 +185,12 @@ For both `resolveCategoryId` and `resolveFeedId`, names are matched using the fo
 
 Note: Matching removes diacritics before comparison (e.g., "Café" ≈ "Cafe").
 
-### 2. Get All Feeds
+#### Disambiguation and Chaining
+A common task is to find content when the user provides a name that could be a category or a feed (e.g., "Show me articles from 'Tech News'"). The recommended workflow is:
+1.  Call `resolveCategoryId` with the user's query (`'Tech News'`).
+2.  **If it returns an ID**: The query refers to a category. You can now use this ID in `searchFeedsByCategory` or `searchEntries`.
+3.  **If it returns `CATEGORY_NOT_FOUND`**: The query likely refers to a feed. Call `resolveFeedId` to get the feed's ID.
+4.  Once you have the `feed_id`, you can use it in `getFeedDetails` or `searchEntries`.
+5.  **If both resolvers fail**: Inform the user that the name could not be found. Use `listCategories` and `listFeeds` to help the user find what they are looking for.
 
-- **`
+This multi-step resolution process ensures that user intent is correctly interpreted before fetching data.
