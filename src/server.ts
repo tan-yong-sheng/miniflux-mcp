@@ -437,7 +437,7 @@ server.registerTool(
   {
     title: "Search Entries",
     description:
-      "Searches for entries (articles). Can be global (using the `search` parameter for full-text search) or scoped by a specific source (using `category_id` or `feed_id`). IMPORTANT: If a global search for an ambiguous term (e.g., `search: 'tech product'`) returns no results, consider the possibility that the user was trying to name a source, not search for a keyword. In that case, ask for clarification: 'Are you trying to search for articles containing the text 'tech product', or is that the name of a category or feed you want to see articles from?' This provides a fallback if the initial interpretation was incorrect.",
+      "Searches for entries (articles). Can be global (using the `search` parameter for full-text search) or scoped by a specific source (using `category_id` or `feed_id`). The `search` parameter expects a single keyword or phrase; it does not support boolean operators like 'OR' or 'AND'. IMPORTANT: If a global search for an ambiguous term (e.g., `search: 'tech product'`) returns no results, consider the possibility that the user was trying to name a source, not search for a keyword. In that case, ask for clarification: 'Are you trying to search for articles containing the text 'tech product', or is that the name of a category or feed you want to see articles from?' This provides a fallback if the initial interpretation was incorrect.",
     inputSchema: {
       category_id: z
         .number()
