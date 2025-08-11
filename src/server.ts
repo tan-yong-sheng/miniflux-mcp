@@ -437,7 +437,7 @@ server.registerTool(
   {
     title: "Search Entries",
     description:
-      "Searches for entries (articles). Can be global or scoped by category, feed, or both. For scoped searches, you MUST provide the numeric ID for the category or feed. Use `resolveCategoryId` to find category IDs and `resolveFeedId` to find feed IDs from user-provided names.",
+      "Searches for entries (articles). Can be global (using the `search` parameter for full-text search) or scoped by a specific source (using `category_id` or `feed_id`). IMPORTANT: If a global search for an ambiguous term (e.g., `search: 'tech product'`) returns no results, consider the possibility that the user was trying to name a source, not search for a keyword. In that case, ask for clarification: 'Are you trying to search for articles containing the text 'tech product', or is that the name of a category or feed you want to see articles from?' This provides a fallback if the initial interpretation was incorrect.",
     inputSchema: {
       category_id: z
         .number()
