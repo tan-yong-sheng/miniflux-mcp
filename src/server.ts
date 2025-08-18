@@ -79,6 +79,25 @@ function tokensAreSubset(queryTokens: string[], targetTokens: string[]): boolean
   return queryTokens.every((token) => targetSet.has(token));
 }
 
+function toUnixSeconds(input: unknown): number | undefined {
+  if (input == null) return undefined;
+  if (typeof input === "number" && Number.isFinite(input)) {
+    return Math.floor(input > 1e12 ? input / 1000 : input);
+  }
+  if (typeof input === "string") {
+    const s = input.trim();
+    if (!s) return undefined;
+    if (/^\d+$/.test(s)) {
+      const n = Number(s);
+      if (!Number.isFinite(n)) return undefined;
+      return Math.floor(n > 1e12 ? n / 1000 : n);
+    }
+    const ms = Date.parse(s);
+    if (!Number.isNaN(ms)) return Math.floor(ms / 1000);
+  }
+  return undefined;
+}
+
 const server = new McpServer({ name: "miniflux-mcp", version: "1.0.0" });
 
 // listCategories
@@ -472,31 +491,31 @@ server.registerTool(
         .optional()
         .describe("Sorting direction: 'asc' or 'desc'."),
       before: z
-        .number()
+        .union([z.number(), z.string()])
         .optional()
-        .describe("Unix timestamp to get entries created before this time."),
+        .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries created before this time."),
       after: z
-        .number()
+        .union([z.number(), z.string()])
         .optional()
-        .describe("Unix timestamp to get entries created after this time."),
+        .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries created after this time."),
       published_before: z
-        .number()
+        .union([z.number(), z.string()])
         .optional()
         .describe(
-          "Unix timestamp to get entries published before this time."
+          "Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries published before this time."
         ),
       published_after: z
-        .number()
+        .union([z.number(), z.string()])
         .optional()
-        .describe("Unix timestamp to get entries published after this time."),
+        .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries published after this time."),
       changed_before: z
-        .number()
+        .union([z.number(), z.string()])
         .optional()
-        .describe("Unix timestamp to get entries changed before this time."),
+        .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries changed before this time."),
       changed_after: z
-        .number()
+        .union([z.number(), z.string()])
         .optional()
-        .describe("Unix timestamp to get entries changed after this time."),
+        .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries changed after this time."),
       before_entry_id: z
         .number()
         .optional()
@@ -517,15 +536,30 @@ server.registerTool(
   if (args.status && Array.isArray(args.status)) for (const s of args.status) params.append("status", s);
   if (typeof args.starred === "boolean") params.set("starred", String(args.starred));
   if (args.offset != null) params.set("offset", String(args.offset));
-  if (args.limit != null) params.set("limit", String(args.limit));
-  if (args.order) params.set("order", args.order);
-  if (args.direction) params.set("direction", args.direction);
-  if (args.before != null) params.set("before", String(args.before));
-  if (args.after != null) params.set("after", String(args.after));
-  if (args.published_before != null) params.set("published_before", String(args.published_before));
-  if (args.published_after != null) params.set("published_after", String(args.published_after));
-  if (args.changed_before != null) params.set("changed_before", String(args.changed_before));
-  if (args.changed_after != null) params.set("changed_after", String(args.changed_after));
+  const limitValue = typeof args.limit === "number" && args.limit > 0 ? args.limit : 20;
+  params.set("limit", String(limitValue));
+  if (args.order) {
+    params.set("order", args.order);
+  } else {
+    params.set("order", "published_at");
+  }
+  if (args.direction) {
+    params.set("direction", args.direction);
+  } else {
+    params.set("direction", "desc");
+  }
+  const beforeTs = toUnixSeconds((args as any).before);
+  if (beforeTs != null) params.set("before", String(beforeTs));
+  const afterTs = toUnixSeconds((args as any).after);
+  if (afterTs != null) params.set("after", String(afterTs));
+  const pbTs = toUnixSeconds((args as any).published_before);
+  if (pbTs != null) params.set("published_before", String(pbTs));
+  const paTs = toUnixSeconds((args as any).published_after);
+  if (paTs != null) params.set("published_after", String(paTs));
+  const cbTs = toUnixSeconds((args as any).changed_before);
+  if (cbTs != null) params.set("changed_before", String(cbTs));
+  const caTs = toUnixSeconds((args as any).changed_after);
+  if (caTs != null) params.set("changed_after", String(caTs));
   if (args.before_entry_id != null) params.set("before_entry_id", String(args.before_entry_id));
   if (args.after_entry_id != null) params.set("after_entry_id", String(args.after_entry_id));
 
@@ -539,7 +573,12 @@ server.registerTool(
     const qs = params.toString();
     const res = await apiRequest(`${path}${qs ? `?${qs}` : ""}`);
     const data = await json<EntriesResponse>(res);
-    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+    const limitNum = typeof args.limit === "number" && args.limit > 0 ? args.limit : 20;
+    const offsetNum = typeof args.offset === "number" && args.offset > 0 ? args.offset : 0;
+    const count = Array.isArray((data as any).entries) ? (data as any).entries.length : 0;
+    const has_more = offsetNum + count < (data as any).total;
+    const next_offset = has_more ? offsetNum + count : null;
+    return { content: [{ type: "text", text: JSON.stringify({ total: data.total, entries: data.entries, limit: limitNum, offset: offsetNum, next_offset, has_more }) }] };
   }
 );
 

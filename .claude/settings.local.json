@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "mcp__tavily-mcp__tavily_extract"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
