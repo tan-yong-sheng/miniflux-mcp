@@ -1,6 +1,6 @@
 {
   "name": "miniflux-mcp",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "A read-only MCP server for the Miniflux RSS reader.",
   "type": "module",
   "main": "dist/server.js",
