@@ -471,10 +471,10 @@ server.registerTool(
         .optional()
         .describe("A text query to search for in the entry's title and content."),
       status: z
-        .array(z.enum(["read", "unread", "removed"]))
+        .string()
         .optional()
         .describe(
-          "Filter entries by status. Provide an array for multiple statuses."
+          "Filter entries by status. Use comma-separated values for multiple statuses (e.g., 'read,unread')."
         ),
       starred: z
         .boolean()
@@ -491,29 +491,29 @@ server.registerTool(
         .optional()
         .describe("Sorting direction: 'asc' or 'desc'."),
       before: z
-        .union([z.number(), z.string()])
+        .string()
         .optional()
         .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries created before this time."),
       after: z
-        .union([z.number(), z.string()])
+        .string()
         .optional()
         .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries created after this time."),
       published_before: z
-        .union([z.number(), z.string()])
+        .string()
         .optional()
         .describe(
           "Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries published before this time."
         ),
       published_after: z
-        .union([z.number(), z.string()])
+        .string()
         .optional()
         .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries published after this time."),
       changed_before: z
-        .union([z.number(), z.string()])
+        .string()
         .optional()
         .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries changed before this time."),
       changed_after: z
-        .union([z.number(), z.string()])
+        .string()
         .optional()
         .describe("Unix timestamp or datetime string (YYYY-MM-DD or ISO) to get entries changed after this time."),
       before_entry_id: z
@@ -533,7 +533,10 @@ server.registerTool(
   async (args) => {
   const params = new URLSearchParams();
   if (args.search) params.set("search", args.search);
-  if (args.status && Array.isArray(args.status)) for (const s of args.status) params.append("status", s);
+  if (args.status) {
+    const statuses = args.status.split(',').map(s => s.trim()).filter(s => ['read', 'unread', 'removed'].includes(s));
+    for (const s of statuses) params.append("status", s);
+  }
   if (typeof args.starred === "boolean") params.set("starred", String(args.starred));
   if (args.offset != null) params.set("offset", String(args.offset));
   const limitValue = typeof args.limit === "number" && args.limit > 0 ? args.limit : 20;
@@ -548,17 +551,17 @@ server.registerTool(
   } else {
     params.set("direction", "desc");
   }
-  const beforeTs = toUnixSeconds((args as any).before);
+  const beforeTs = toUnixSeconds(args.before);
   if (beforeTs != null) params.set("before", String(beforeTs));
-  const afterTs = toUnixSeconds((args as any).after);
+  const afterTs = toUnixSeconds(args.after);
   if (afterTs != null) params.set("after", String(afterTs));
-  const pbTs = toUnixSeconds((args as any).published_before);
+  const pbTs = toUnixSeconds(args.published_before);
   if (pbTs != null) params.set("published_before", String(pbTs));
-  const paTs = toUnixSeconds((args as any).published_after);
+  const paTs = toUnixSeconds(args.published_after);
   if (paTs != null) params.set("published_after", String(paTs));
-  const cbTs = toUnixSeconds((args as any).changed_before);
+  const cbTs = toUnixSeconds(args.changed_before);
   if (cbTs != null) params.set("changed_before", String(cbTs));
-  const caTs = toUnixSeconds((args as any).changed_after);
+  const caTs = toUnixSeconds(args.changed_after);
   if (caTs != null) params.set("changed_after", String(caTs));
   if (args.before_entry_id != null) params.set("before_entry_id", String(args.before_entry_id));
   if (args.after_entry_id != null) params.set("after_entry_id", String(args.after_entry_id));
