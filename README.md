@@ -90,7 +90,7 @@ The server provides the following read-only tools for interacting with Miniflux.
 *   **`listCategories(counts)`**: Lists all categories for browsing (optionally with counts).
 *   **`listFeeds()`**: Lists all feeds for browsing.
 *   **`searchFeedsByCategory(category_id, query)`**: Searches for feeds within a *specific category*.
-*   **`getFeedDetails(feed_id)`**: Retrieves details for a *single feed*.
+*   **`resolveId(query, limit?)`**: Fuzzy resolve a name or numeric ID across categories and feeds.
 *   **`searchEntries(...)`**: Searches for articles globally or scoped by `category_id` or `feed_id`.
 
 ## Development

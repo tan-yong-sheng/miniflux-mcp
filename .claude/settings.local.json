@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(npm run build)",
-      "mcp__tavily-mcp__tavily_extract"
+      "mcp__tavily-mcp__tavily_extract",
+      "WebSearch",
+      "Bash(npm run typecheck)"
     ],
     "deny": [],
     "ask": []

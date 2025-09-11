@@ -91,9 +91,8 @@ paths:
   /v1/feeds/{feedID}:
     get:
       summary: Get Feed
-      description: Returns details for a single feed.
+      description: Returns details for a single feed. (Not exposed as a dedicated MCP tool; feed details are discoverable via listFeeds output or by resolving an ID with resolveId.)
       operationId: getFeed
-      x-mcp-function: getFeedDetails
       parameters:
         - name: feedID
           in: path

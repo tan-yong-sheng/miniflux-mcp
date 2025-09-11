@@ -36,7 +36,7 @@ For name/ID inputs, callers must provide numeric IDs directly (no automatic reso
 - `listCategories(counts?)`: Optionally include unread/feed counts.
 - `listFeeds()`: Full feed listing.
 - `searchFeedsByCategory(category_id, query?)`: Filter feeds within a category by substring.
-- `getFeedDetails(feed_id)`: Single feed metadata.
+- `resolveId(query, limit?)`: Fuzzy resolve a name or numeric ID across categories and feeds (always searches both); returns scored matches plus optional exact numeric match metadata.
 - `searchEntries(...)`: Global or scoped (category/feed) entry search with pagination & temporal filters; constructs URLSearchParams; returns pagination hints (`has_more`, `next_offset`). Default order: `published_at desc`. Accepts flexible datetime / unix inputs (normalized by `toUnixSeconds`).
 
 ## Key Implementation Details

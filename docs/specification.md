@@ -9,8 +9,8 @@
   - Backed by: `GET /v1/categories` (optional `?counts=true` to include `total_unread` and `feed_count` since 2.0.46)
 - **searchFeedsByCategory(category_id: number, query?: string) -> Feed[]**
   - Backed by: `GET /v1/categories/{categoryID}/feeds` with client-side filter.
-- **getFeedDetails(feed_id: number) -> Feed**
-  - Backed by: `GET /v1/feeds/{feedID}`.
+- **resolveId(query: string, limit?: number) -> { matches: { categories: {id,title,score}[], feeds: {id,title,score}[] }, exact_id_match?, inferred_kind? }**
+  - Backed by: parallel `GET /v1/categories` + `GET /v1/feeds` with in-process fuzzy scoring (no Miniflux write actions).
 - **searchEntries(...) -> { total: number, entries: Entry[] }**
   - Backed by: `GET /v1/entries`, `/v1/categories/{categoryID}/entries`, `/v1/feeds/{feedID}/entries`.
   - Supports server-side filters: `search`, `status`, `starred`, `offset`, `limit`, `order`, `direction`, `before`, `after`, `published_before`, `published_after`, `changed_before`, `changed_after`, `before_entry_id`, `after_entry_id`.
@@ -33,7 +33,7 @@ curl -sS -H "X-Auth-Token: $TOKEN" "$BASE_URL/v1/me"
 ### Endpoints Used
 - Get Categories: `GET /v1/categories` (optional `?counts=true`)
 - Get Category Feeds: `GET /v1/categories/{categoryID}/feeds`
-- Get Feed: `GET /v1/feeds/{feedID}`
+- (Deprecated in MCP layer) Get Feed: `GET /v1/feeds/{feedID}` (still available via API but not exposed as a dedicated tool; use `listFeeds` + `resolveId` to locate feed ID)
 - Get Entries: `GET /v1/entries`
 - Get Category Entries: `GET /v1/categories/{categoryID}/entries`
 - Get Feed Entries: `GET /v1/feeds/{feedID}/entries`

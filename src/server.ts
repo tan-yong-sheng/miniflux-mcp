@@ -319,6 +319,95 @@ server.registerTool(
   }
 );
 
+server.registerTool(
+  "resolveId",
+  {
+    title: "Resolve Category or Feed ID",
+    description: "Fuzzy resolve a user-supplied name or numeric ID to matching categories and feeds (always searches both types).",
+    inputSchema: {
+      query: z.string().describe("Name fragment or numeric ID to resolve."),
+      limit: z.number().optional().describe("Maximum matches per type (default 10, max 25).")
+    }
+  },
+  async ({ query, limit }) => {
+    const qRaw = query.trim();
+    const qLower = toLower(qRaw);
+    const qCollapsed = collapseNonAlnum(qRaw);
+    const qTokens = tokenizeAlnum(qRaw);
+    const numericId = /^\d+$/.test(qRaw) ? Number(qRaw) : null;
+
+    const wantCategories = true;
+    const wantFeeds = true;
+
+    let categories: Category[] = [];
+    let feeds: Feed[] = [];
+    try {
+      const promises: Promise<void>[] = [];
+      if (wantCategories) {
+        promises.push(
+          apiRequest(`/v1/categories`).then(r => json<Category[]>(r)).then(data => { categories = data; })
+        );
+      }
+      if (wantFeeds) {
+        promises.push(
+          apiRequest(`/v1/feeds`).then(r => json<any[]>(r)).then(data => { feeds = data as Feed[]; })
+        );
+      }
+      await Promise.all(promises);
+    } catch (e: any) {
+      return { content: [{ type: "text", text: JSON.stringify({ isError: true, error: "FETCH_FAILED", message: String(e) }) }] };
+    }
+
+    interface Scored<T> { item: T; score: number }
+    function score(title: string, id: number): number {
+      const lower = toLower(title);
+      const collapsed = collapseNonAlnum(title);
+      const tokens = tokenizeAlnum(title);
+      let s = 0;
+      if (numericId != null && id === numericId) s = Math.max(s, 90);
+      if (lower === qLower) s = Math.max(s, 100);
+      if (collapsed === qCollapsed && qCollapsed.length > 0) s = Math.max(s, 70);
+      if (tokensAreSubset(qTokens, tokens)) s = Math.max(s, 50);
+      if (lower.includes(qLower) && qLower.length > 0) s = Math.max(s, 30);
+      return s;
+    }
+
+    const limitPer = (typeof limit === "number" && limit > 0 ? Math.min(limit, 25) : 10);
+
+    let matchedCategories: Scored<Category>[] = [];
+    if (wantCategories) {
+      matchedCategories = categories.map(c => ({ item: c, score: score(c.title, c.id) }))
+        .filter(m => m.score >= 30 || (numericId != null && m.item.id === numericId))
+        .sort((a,b) => b.score - a.score || a.item.title.localeCompare(b.item.title));
+    }
+
+    let matchedFeeds: Scored<Feed>[] = [];
+    if (wantFeeds) {
+      matchedFeeds = feeds.map(f => ({ item: f, score: score(f.title, f.id) }))
+        .filter(m => m.score >= 30 || (numericId != null && m.item.id === numericId))
+        .sort((a,b) => b.score - a.score || a.item.title.localeCompare(b.item.title));
+    }
+
+    const catTruncated = matchedCategories.length > limitPer;
+    const feedTruncated = matchedFeeds.length > limitPer;
+
+    const categoriesOut = matchedCategories.slice(0, limitPer).map(m => ({ id: m.item.id, title: m.item.title, score: m.score }));
+    const feedsOut = matchedFeeds.slice(0, limitPer).map(m => ({ id: m.item.id, title: (m.item as any).title, score: m.score }));
+
+    let inferred_kind: string | null = null;
+    if (categoriesOut.length > 0 && feedsOut.length === 0) inferred_kind = "category";
+    else if (feedsOut.length > 0 && categoriesOut.length === 0) inferred_kind = "feed";
+
+    let exact_id_match: { type: string; id: number } | null = null;
+    if (numericId != null) {
+      if (wantCategories && categories.some(c => c.id === numericId)) exact_id_match = { type: "category", id: numericId };
+      else if (wantFeeds && feeds.some(f => f.id === numericId)) exact_id_match = { type: "feed", id: numericId };
+    }
+
+    return { content: [{ type: "text", text: JSON.stringify({ query: qRaw, inferred_kind, exact_id_match, matches: { categories: categoriesOut, feeds: feedsOut }, truncated: catTruncated || feedTruncated }) }] };
+  }
+);
+
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
