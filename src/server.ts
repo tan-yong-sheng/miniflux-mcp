@@ -160,26 +160,6 @@ server.registerTool(
   }
 );
 
-// getFeedDetails
-server.registerTool(
-  "getFeedDetails",
-  {
-    title: "Get Feed Details",
-    description: "Get details for a single Miniflux feed.",
-    inputSchema: {
-      feed_id: z
-        .number()
-        .describe(
-          "Numeric ID of the feed."
-        ),
-    },
-  },
-  async ({ feed_id }) => {
-  const res = await apiRequest(`/v1/feeds/${feed_id}`);
-  const feed = await json<Feed>(res);
-    return { content: [{ type: "text", text: JSON.stringify({ feed }) }] };
-  }
-);
 
 // listFeeds
 server.registerTool(
