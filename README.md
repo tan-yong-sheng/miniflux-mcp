@@ -84,21 +84,14 @@ If you are developing the server locally, you can point the client directly to y
 
 The server provides the following read-only tools for interacting with Miniflux.
 
-**Resolver/Search Workflow:**
-For any query involving a name (e.g., "find 'Tech Stuff'"), you must follow this sequence:
-1.  `resolveCategoryId`: Try to match the name to a category.
-2.  `resolveFeedId`: If no category is found, try to match the name to a feed.
-3.  `listCategories` / `listFeeds`: If both resolvers fail, inform the user and offer these tools to help them find the correct name.
 
 **Available Tools:**
 
-*   **`resolveCategoryId(category_name)`**: **(Step 1)** Resolves a category name to its ID.
-*   **`resolveFeedId(feed_query)`**: **(Step 2)** Resolves a feed name/URL to its ID.
-*   **`listCategories(counts)`**: **(Fallback)** Lists all categories for browsing.
-*   **`listFeeds()`**: **(Fallback)** Lists all feeds for browsing.
+*   **`listCategories(counts)`**: Lists all categories for browsing (optionally with counts).
+*   **`listFeeds()`**: Lists all feeds for browsing.
 *   **`searchFeedsByCategory(category_id, query)`**: Searches for feeds within a *specific category*.
 *   **`getFeedDetails(feed_id)`**: Retrieves details for a *single feed*.
-*   **`searchEntries(...)`**: Searches for articles. Can be scoped by `category_id` or `feed_id` once resolved.
+*   **`searchEntries(...)`**: Searches for articles globally or scoped by `category_id` or `feed_id`.
 
 ## Development
 

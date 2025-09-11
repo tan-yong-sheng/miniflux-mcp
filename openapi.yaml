@@ -3,9 +3,7 @@ info:
   title: Miniflux MCP Read-Only API
   version: 0.0.1
   description: |
-    Read-only subset of Miniflux API for MCP usage. Covers listing/searching feeds,
-    resolving category ID by name (via client-side filtering), listing feeds in a category,
-    and fetching details of a single feed.
+    Read-only subset of Miniflux API for MCP usage. Covers listing/searching feeds, listing feeds in a category, and fetching details of a single feed.
 
 servers:
   - url: https://miniflux.example.org
@@ -19,10 +17,10 @@ paths:
       summary: Get Categories
       description: |
         Returns all categories for the authenticated user. Optionally include counters since Miniflux 2.0.46.
-        MCP guidance: Expose this operation as the `listCategories` tool to allow browsing categories. It is also used by `resolveCategoryId` to convert a user-provided category name into a numeric `category_id`. Titles are user-defined and might not be unique; implement exact match first, then fallback strategies.
+        MCP guidance: Expose this operation as the `listCategories` tool to allow browsing categories.
       x-mcp-function: listCategories
       x-mcp-guidance: |
-        Expose as `listCategories`. This tool is for user browsing or as a fallback to help the user find a category after the `resolveCategoryId` and `resolveFeedId` tools have both failed.
+        Expose as `listCategories` for user browsing.
       operationId: getCategories
       parameters:
         - name: counts
@@ -47,11 +45,11 @@ paths:
     get:
       summary: Get All Feeds
       description: |
-        Returns all feeds for the authenticated user. This endpoint is used by the `listFeeds` tool to get a list of all feeds, and by the `resolveFeedId` tool to find a feed's numeric ID from its name or URL.
+        Returns all feeds for the authenticated user. This endpoint is used by the `listFeeds` tool to get a list of all feeds.
       operationId: getFeeds
       x-mcp-function: listFeeds
       x-mcp-guidance: |
-        Expose as `listFeeds` for user browsing or as a fallback after resolvers fail. Also used by `resolveFeedId` to get the list of feeds to search through.
+        Expose as `listFeeds` for user browsing.
       responses:
         '200':
           description: A list of all feeds
@@ -71,7 +69,7 @@ paths:
       operationId: getCategoryFeeds
       x-mcp-function: searchFeedsByCategory
       x-mcp-guidance: |
-        This operation requires a numeric `category_id`. If the user provides only a category name, call `resolveCategoryId` first to obtain the `category_id`.
+        This operation requires a numeric `category_id`.
       parameters:
         - name: categoryID
           in: path
@@ -154,7 +152,7 @@ paths:
       operationId: getCategoryEntries
       x-mcp-function: searchEntries
       x-mcp-guidance: |
-        This operation requires a numeric `category_id`. If the user provides only a category name, call `resolveCategoryId` first.
+        This operation requires a numeric `category_id`.
       parameters:
         - name: categoryID
           in: path

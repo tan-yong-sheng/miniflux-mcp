@@ -1,19 +1,14 @@
 ### Miniflux MCP Read-Only Spec
 
 #### Scope
-- **Read-only only**: list/search all feeds, resolve category ID by name, list/search feeds within a category, fetch a single feed’s details.
+- **Read-only only**: list/search all feeds, list/search feeds within a category, fetch a single feed’s details.
 - No write operations are used.
 
 #### MCP Function Mapping and Usage Guidance
 - **listCategories(counts?: boolean) -> Category[]**
   - Backed by: `GET /v1/categories` (optional `?counts=true` to include `total_unread` and `feed_count` since 2.0.46)
-- **resolveCategoryId(category_name: string) -> number**
-  - Backed by: `GET /v1/categories`
-  - Behavior: Find category by title. If multiple exact matches exist, return the first; otherwise consider case-insensitive exact match, then case-insensitive partial match. If ambiguous, return a disambiguation error with candidate IDs.
-  - Note: Prefer exact title matches. Titles are user-defined and not guaranteed unique.
 - **searchFeedsByCategory(category_id: number, query?: string) -> Feed[]**
   - Backed by: `GET /v1/categories/{categoryID}/feeds` with client-side filter.
-  - Critical: You must call `resolveCategoryId` first if you only have a category name. Skip if the user explicitly provided a numeric `category_id`.
 - **getFeedDetails(feed_id: number) -> Feed**
   - Backed by: `GET /v1/feeds/{feedID}`.
 - **searchEntries(...) -> { total: number, entries: Entry[] }**
@@ -48,7 +43,7 @@ Notes:
 - For articles (entries), server-side filters exist, including time-window filters via Unix timestamps (see below).
 
 #### Likely User Queries this MCP should support (read-only)
-- Resolve a category ID by name, then search feeds in that category.
+- List categories then search feeds in a category.
 - Get details for a single feed.
 - Search entries (articles) globally, by category, or by feed, with filters:
   - text `search`, `status` (read/unread/removed), `starred`, pagination (`offset`, `limit`), sorting (`order`, `direction`)
@@ -56,26 +51,8 @@ Notes:
 
 ---
 
-### 1) Resolve Category ID from Category Name
+### 1) List Categories
 Ref: Get Categories
-
-List categories:
-```bash
-curl -sS -H "X-Auth-Token: $TOKEN" "$BASE_URL/v1/categories"
-```
-
-Resolve a category ID by exact title match (case-sensitive):
-```bash
-export CATEGORY_NAME="Engineering Blogs"
-CATEGORY_ID=$(curl -sS -H "X-Auth-Token: $TOKEN" "$BASE_URL/v1/categories" \
-  | jq -r --arg name "$CATEGORY_NAME" '.[] | select(.title == $name) | .id' | head -n1)
-echo "$CATEGORY_ID"
-```
-
-Usage requirement for MCP implementers:
-- If the user provides only a category name (no numeric `category_id`), call your `resolveCategoryId(category_name)` function first and use the returned ID for subsequent category-scoped operations (such as `searchFeedsByCategory`). If multiple or no matches are found, surface a clear error or disambiguation prompt.
-
-Optional (since 2.0.46): include counters
 ```bash
 curl -sS -H "X-Auth-Token: $TOKEN" "$BASE_URL/v1/categories?counts=true"
 ```
@@ -98,8 +75,7 @@ curl -sS -H "X-Auth-Token: $TOKEN" "$BASE_URL/v1/categories/$CATEGORY_ID/feeds" 
     ]'
 ```
 
-Important flow dependency:
-- `searchFeedsByCategory` requires a numeric `category_id`. If your input is a category name, first invoke `resolveCategoryId(category_name)` to obtain the `category_id`. Only skip this step if the user explicitly provided a numeric `category_id`.
+Important: `searchFeedsByCategory` requires a numeric `category_id`; obtain it by listing categories first.
 
 ### 3) Get Details of a Single Feed
 Ref: Get Feed
@@ -173,22 +149,3 @@ curl -sS -H "X-Auth-Token: $TOKEN" \
 ### Non-Goals
 - No mutations: endpoints like create/update/delete feeds, entries, categories are intentionally excluded.
 
-#### Resolver Matching Algorithm
-For both `resolveCategoryId` and `resolveFeedId`, names are matched using the following order:
-1) Exact match (case-sensitive)
-2) Case-insensitive equality
-3) Collapsed non-alphanumeric equality (remove spaces/punctuation; e.g., "AI Code King" ≈ "AICodeKing")
-4) Token subset match (all query tokens must appear in target tokens)
-5) Partial includes (lowercased and collapsed comparisons)
-
-Note: Matching removes diacritics before comparison (e.g., "Café" ≈ "Cafe").
-
-#### Disambiguation and Chaining
-A common task is to find content when the user provides a name that could be a category or a feed (e.g., "Show me articles from 'Tech News'"). The recommended workflow is:
-1.  Call `resolveCategoryId` with the user's query (`'Tech News'`).
-2.  **If it returns an ID**: The query refers to a category. You can now use this ID in `searchFeedsByCategory` or `searchEntries`.
-3.  **If it returns `CATEGORY_NOT_FOUND`**: The query likely refers to a feed. Call `resolveFeedId` to get the feed's ID.
-4.  Once you have the `feed_id`, you can use it in `getFeedDetails` or `searchEntries`.
-5.  **If both resolvers fail**: Inform the user that the name could not be found. Use `listCategories` and `listFeeds` to help the user find what they are looking for.
-
-This multi-step resolution process ensures that user intent is correctly interpreted before fetching data.

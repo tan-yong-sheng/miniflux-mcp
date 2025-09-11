@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc -p .",
+    "typecheck": "tsc --noEmit -p .",
     "start": "node dist/server.js"
   },
   "files": [

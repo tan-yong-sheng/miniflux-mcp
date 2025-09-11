@@ -106,7 +106,7 @@ server.registerTool(
   {
     title: "List Miniflux Categories",
     description:
-      "Lists all available Miniflux categories. This tool is useful for general user browsing, or as a fallback to help the user find a category after the `resolveCategoryId` and `resolveFeedId` tools have both failed to find a match for their query.",
+      "Lists all available Miniflux categories for browsing.",
     inputSchema: {
       counts: z
         .boolean()
@@ -124,260 +124,7 @@ server.registerTool(
   }
 );
 
-// resolveCategoryId
-server.registerTool(
-  "resolveCategoryId",
-  {
-    title: "Resolve Category ID",
-    description:
-      "Resolves a category name to its numeric ID. This is the FIRST tool to call for any ambiguous user query that contains a name (e.g., 'show me posts from \"Tech Stuff\"'). If this tool succeeds, use the returned ID for other functions. If it returns `CATEGORY_NOT_FOUND`, the name might refer to a feed, and you should call `resolveFeedId` next.",
-    inputSchema: {
-      category_name: z
-        .string()
-        .describe(
-          "The display name of the category. Matching uses exact, case-insensitive, and normalized comparisons that ignore spaces/punctuation and diacritics."
-        ),
-    },
-  },
-  async ({ category_name }) => {
-    const res = await apiRequest(`/v1/categories`);
-    const categories = await json<Category[]>(res);
 
-    const raw = category_name;
-    const lower = toLower(raw);
-    const collapsed = collapseNonAlnum(raw);
-    const queryTokens = tokenizeAlnum(raw);
-
-    // 1) Exact (case-sensitive)
-    let match = categories.find((c) => (c.title || "") === raw);
-    if (!match) {
-      // 2) Case-insensitive
-      match = categories.find((c) => toLower(c.title || "") === lower);
-    }
-    if (!match) {
-      // 3) Collapsed non-alnum equals
-      match = categories.find(
-        (c) => collapseNonAlnum(c.title || "") === collapsed
-      );
-    }
-    if (match) {
-      return {
-        content: [{ type: "text", text: JSON.stringify({ category_id: match.id }) }],
-      };
-    }
-
-    // 4) Token subset match
-    const tokenCandidates = categories.filter((c) =>
-      tokensAreSubset(queryTokens, tokenizeAlnum(c.title || ""))
-    );
-    if (tokenCandidates.length === 1) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ category_id: tokenCandidates[0].id }) },
-        ],
-      };
-    }
-    if (tokenCandidates.length > 1) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              error: "AMBIGUOUS_CATEGORY",
-              candidates: tokenCandidates.map((c) => ({ id: c.id, title: c.title })),
-            }),
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    // 5) Partial includes (lower/collapsed)
-    const partial = categories.filter((c) => {
-      const t = c.title || "";
-      return (
-        toLower(t).includes(lower) || collapseNonAlnum(t).includes(collapsed)
-      );
-    });
-
-    if (partial.length === 1) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ category_id: partial[0].id }) },
-        ],
-      };
-    }
-
-    if (partial.length > 1) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              error: "AMBIGUOUS_CATEGORY",
-              candidates: partial.map((c) => ({ id: c.id, title: c.title })),
-            }),
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    return {
-      content: [
-        { type: "text", text: JSON.stringify({ error: "CATEGORY_NOT_FOUND" }) },
-      ],
-      isError: true,
-    };
-  }
-);
-
-// resolveFeedId
-server.registerTool(
-  "resolveFeedId",
-  {
-    title: "Resolve Feed ID",
-    description:
-      "Resolves a feed's name or URL to its numeric ID. This is the SECOND tool to call for an ambiguous user query, but ONLY after `resolveCategoryId` has already been tried and failed. If this tool also returns `FEED_NOT_FOUND`, you MUST inform the user that no match was found and offer to list all categories or feeds using the `listCategories` or `listFeeds` tools to help them.",
-    inputSchema: {
-      feed_query: z
-        .string()
-        .describe(
-          "Feed title or URL (site_url or feed_url). Exact, case-insensitive, token, and normalized matches are attempted in this order."
-        ),
-    },
-  },
-  async ({ feed_query }) => {
-    const res = await apiRequest(`/v1/feeds`);
-    const feeds = await json<Feed[]>(res);
-
-    const raw = feed_query;
-    const lower = toLower(raw);
-    const collapsed = collapseNonAlnum(raw);
-    const queryTokens = tokenizeAlnum(raw);
-
-    // 1) Exact (case-sensitive) title match
-    let exactTitle = feeds.find((f) => (f.title || "") === raw);
-    if (exactTitle) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ feed_id: exactTitle.id }) },
-        ],
-      };
-    }
-
-    // 2) Case-insensitive equality checks (title, site_url, feed_url)
-    let ciEquals = feeds.find(
-      (f) =>
-        toLower(f.title || "") === lower ||
-        toLower(f.site_url || "") === lower ||
-        toLower(f.feed_url || "") === lower
-    );
-    if (ciEquals) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ feed_id: ciEquals.id }) },
-        ],
-      };
-    }
-
-    // 3) Collapsed non-alnum equality (title, site_url, feed_url)
-    let collapsedEq = feeds.find(
-      (f) =>
-        collapseNonAlnum(f.title || "") === collapsed ||
-        collapseNonAlnum(f.site_url || "") === collapsed ||
-        collapseNonAlnum(f.feed_url || "") === collapsed
-    );
-    if (collapsedEq) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ feed_id: collapsedEq.id }) },
-        ],
-      };
-    }
-
-    // 4) Token subset match on title
-    const tokenCandidates = feeds.filter((f) =>
-      tokensAreSubset(queryTokens, tokenizeAlnum(f.title || ""))
-    );
-    if (tokenCandidates.length === 1) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ feed_id: tokenCandidates[0].id }) },
-        ],
-      };
-    }
-    if (tokenCandidates.length > 1) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              error: "AMBIGUOUS_FEED",
-              candidates: tokenCandidates.map((f) => ({
-                id: f.id,
-                title: f.title,
-                site_url: f.site_url,
-                feed_url: f.feed_url,
-              })),
-            }),
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    // 5) Partial includes across lower/collapsed in title, site_url, feed_url
-    const partial = feeds.filter((f) => {
-      const t = f.title || "";
-      const s = f.site_url || "";
-      const u = f.feed_url || "";
-      return (
-        toLower(t).includes(lower) ||
-        toLower(s).includes(lower) ||
-        toLower(u).includes(lower) ||
-        collapseNonAlnum(t).includes(collapsed) ||
-        collapseNonAlnum(s).includes(collapsed) ||
-        collapseNonAlnum(u).includes(collapsed)
-      );
-    });
-
-    if (partial.length === 1) {
-      return {
-        content: [
-          { type: "text", text: JSON.stringify({ feed_id: partial[0].id }) },
-        ],
-      };
-    }
-
-    if (partial.length > 1) {
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify({
-              error: "AMBIGUOUS_FEED",
-              candidates: partial.map((f) => ({
-                id: f.id,
-                title: f.title,
-                site_url: f.site_url,
-                feed_url: f.feed_url,
-              })),
-            }),
-          },
-        ],
-        isError: true,
-      };
-    }
-
-    return {
-      content: [
-        { type: "text", text: JSON.stringify({ error: "FEED_NOT_FOUND" }) },
-      ],
-      isError: true,
-    };
-  }
-);
 
 // searchFeedsByCategory
 server.registerTool(
@@ -389,7 +136,7 @@ server.registerTool(
       category_id: z
         .number()
         .describe(
-          "Numeric ID of the category. You must use `resolveCategoryId` to get this value if the user provides a category name instead of an ID."
+          "Numeric ID of the category."
         ),
       query: z
         .string()
@@ -423,7 +170,7 @@ server.registerTool(
       feed_id: z
         .number()
         .describe(
-          "Numeric ID of the feed. If you only have the feed's name, you must use `resolveFeedId` to get the numeric feed ID."
+          "Numeric ID of the feed."
         ),
     },
   },
@@ -440,13 +187,20 @@ server.registerTool(
   {
     title: "List All Feeds",
     description:
-      "Lists all feeds for the authenticated user. This tool is useful for general user browsing, or as a fallback to help the user find a feed after the `resolveCategoryId` and `resolveFeedId` tools have both failed to find a match for their query.",
+      "Lists all feeds for the authenticated user.",
     inputSchema: {},
   },
   async () => {
     const res = await apiRequest(`/v1/feeds`);
-    const feeds = await json<Feed[]>(res);
-    return { content: [{ type: "text", text: JSON.stringify({ feeds }) }] };
+    const feeds = await json<any[]>(res);
+    const mapped = feeds.map(f => ({
+      id: f.id,
+      user_id: f.user_id ?? null,
+      site_url: f.site_url ?? null,
+      title: f.title,
+      category: f.category ? { id: f.category.id, title: f.category.title } : null
+    }));
+    return { content: [{ type: "text", text: JSON.stringify({ feeds: mapped }) }] };
   }
 );
 
